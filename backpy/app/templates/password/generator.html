@@ -1,0 +1,127 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row mb-4">
+        <div class="col">
+            <h1>Password Generator</h1>
+        </div>
+        <div class="col-auto">
+            <a href="{{ url_for('password.dashboard') }}" class="btn btn-secondary">Back to Dashboard</a>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-md-6">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5>Generate a Secure Password</h5>
+                </div>
+                <div class="card-body">
+                    <form method="POST" action="{{ url_for('password.generator') }}">
+                        {{ form.hidden_tag() }}
+                        
+                        <div class="form-group">
+                            {{ form.length.label }}
+                            {{ form.length(class="form-control", min=4, max=100) }}
+                        </div>
+                        
+                        <div class="form-check mb-2">
+                            {{ form.include_uppercase(class="form-check-input") }}
+                            {{ form.include_uppercase.label(class="form-check-label") }}
+                        </div>
+                        
+                        <div class="form-check mb-2">
+                            {{ form.include_lowercase(class="form-check-input") }}
+                            {{ form.include_lowercase.label(class="form-check-label") }}
+                        </div>
+                        
+                        <div class="form-check mb-2">
+                            {{ form.include_numbers(class="form-check-input") }}
+                            {{ form.include_numbers.label(class="form-check-label") }}
+                        </div>
+                        
+                        <div class="form-check mb-3">
+                            {{ form.include_symbols(class="form-check-input") }}
+                            {{ form.include_symbols.label(class="form-check-label") }}
+                        </div>
+                        
+                        <div class="form-group">
+                            {{ form.submit(class="btn btn-primary") }}
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+        
+        {% if generated_password %}
+        <div class="col-md-6">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5>Your Generated Password</h5>
+                </div>
+                <div class="card-body">
+                    <div class="input-group mb-3">
+                        <input type="text" class="form-control" id="generatedPassword" value="{{ generated_password }}" readonly>
+                        <div class="input-group-append">
+                            <button class="btn btn-outline-secondary" type="button" id="copyButton">
+                                <i class="fa fa-copy"></i> Copy
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="mt-4">
+                        <h5>Save This Password</h5>
+                        <form method="POST" action="{{ url_for('password.save_password') }}">
+                            {{ save_form.hidden_tag() }}
+                            
+                            <div class="form-group">
+                                {{ save_form.name.label }}
+                                {{ save_form.name(class="form-control") }}
+                            </div>
+                            
+                            <div class="form-group">
+                                {{ save_form.username.label }}
+                                {{ save_form.username(class="form-control") }}
+                            </div>
+                            
+                            <div class="form-group">
+                                {{ save_form.website.label }}
+                                {{ save_form.website(class="form-control", placeholder="https://example.com") }}
+                            </div>
+                            
+                            {{ save_form.password(value=generated_password) }}
+                            
+                            <div class="form-group">
+                                {{ save_form.submit(class="btn btn-success") }}
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+{% if generated_password %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const copyButton = document.getElementById('copyButton');
+        const generatedPassword = document.getElementById('generatedPassword');
+        
+        copyButton.addEventListener('click', function() {
+            generatedPassword.select();
+            document.execCommand('copy');
+            
+            // Change button text temporarily
+            const originalText = copyButton.innerHTML;
+            copyButton.innerHTML = '<i class="fa fa-check"></i> Copied!';
+            setTimeout(() => {
+                copyButton.innerHTML = originalText;
+            }, 2000);
+        });
+    });
+</script>
+{% endif %}
+{% endblock %} 

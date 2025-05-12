@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-5">
+    <div class="jumbotron text-center">
+        <h1 class="display-4">Welcome to Password Manager</h1>
+        <p class="lead">A secure way to generate and store your passwords</p>
+        <hr class="my-4">
+        <p>Please sign in to access your dashboard or generate new passwords.</p>
+        <a class="btn btn-primary btn-lg" href="{{ url_for('auth.login') }}" role="button">Login</a>
+        <a class="btn btn-secondary btn-lg" href="{{ url_for('auth.register') }}" role="button">Register</a>
+    </div>
+</div>
+{% endblock %} 
