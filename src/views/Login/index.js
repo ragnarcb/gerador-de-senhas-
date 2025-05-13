@@ -108,6 +108,13 @@ const Login = ({ navigation }) => {
           password: formData.password
         });
         
+        // Garantir que o username está incluído no resultado
+        if (!result.username && formData.username) {
+          result.username = formData.username;
+        }
+        
+        console.log('Resultado do login com username:', result);
+        
         // Usar o contexto de autenticação para fazer login
         await login(result);
         console.log('Login bem-sucedido!');

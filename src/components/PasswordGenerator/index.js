@@ -40,21 +40,49 @@ const PasswordGenerator = ({ navigation }) => {
   const loadData = async () => {
     setIsLoading(true);
     try {
+      console.log('PasswordGenerator: Carregando dados...');
+      
       // Load local history
       const history = await getPasswordHistory();
       setPasswordHistory(history);
+      console.log(`PasswordGenerator: ${history.length} itens no histórico local carregados`);
       
-      // Load saved passwords from API
-      const apiSavedPasswords = await passwordApi.getSavedPasswords();
-      setSavedPasswords(apiSavedPasswords || []);
+      try {
+        // Verificar autenticação antes de carregar senhas do servidor
+        const isAuth = await import('../../utils/authUtils').then(module => {
+          return module.isAuthenticated();
+        });
+        
+        if (!isAuth) {
+          console.log('PasswordGenerator: Usuário não está autenticado, pulando carregamento de senhas do servidor');
+          return;
+        }
+        
+        // Load saved passwords from API
+        const apiSavedPasswords = await passwordApi.getSavedPasswords();
+        setSavedPasswords(apiSavedPasswords || []);
+        console.log(`PasswordGenerator: ${apiSavedPasswords?.length || 0} senhas carregadas do servidor`);
+      } catch (error) {
+        console.error('Erro ao carregar senhas do servidor:', error);
+        // Mostra mensagem somente se for erro de autenticação
+        if (error.response && error.response.status === 401) {
+          Alert.alert('Sessão expirada', 'Sua sessão expirou. Por favor, faça login novamente.');
+        } else {
+          // Para outros erros, mantenha as senhas locais que já estão carregadas
+          // e apenas mostre um aviso
+          console.log('PasswordGenerator: Usando apenas senhas locais devido a erro de conexão');
+          setTimeout(() => {
+            Alert.alert(
+              'Modo offline', 
+              'Não foi possível conectar ao servidor. Algumas funcionalidades podem estar limitadas.',
+              [{ text: 'OK' }]
+            );
+          }, 500);
+        }
+      }
     } catch (error) {
       console.error('Erro ao carregar dados:', error);
-      if (error.response && error.response.status === 401) {
-        Alert.alert('Sessão expirada', 'Sua sessão expirou. Por favor, faça login novamente.');
-        // O ProtectedRoute irá redirecionar para a tela de login
-      } else {
-        Alert.alert('Erro', 'Não foi possível carregar as senhas.');
-      }
+      Alert.alert('Erro', 'Não foi possível carregar o histórico de senhas.');
     } finally {
       setIsLoading(false);
     }
@@ -63,13 +91,16 @@ const PasswordGenerator = ({ navigation }) => {
   const generateNewPassword = async () => {
     setIsGenerating(true);
     try {
-      // Generate password from API
-      const newPassword = await passwordApi.generatePassword({ length: 12 });
+      // Gerar senha localmente em vez de chamar a API
+      const newPassword = await import('../../services/passwordGenerator').then(module => {
+        return module.generatePassword(12, true, true, true, true);
+      });
+      
       setPassword(newPassword);
       
       // Save to local history
       await saveToHistory(newPassword);
-      
+    
       // Reload history
       const history = await getPasswordHistory();
       setPasswordHistory(history);
@@ -79,6 +110,11 @@ const PasswordGenerator = ({ navigation }) => {
     } finally {
       setIsGenerating(false);
     }
+  };
+
+  const clearPassword = () => {
+    setPassword('');
+    setPasswordName('');
   };
 
   const savePassword = async () => {
@@ -104,8 +140,45 @@ const PasswordGenerator = ({ navigation }) => {
       setSavedPasswords(apiSavedPasswords || []);
     } catch (error) {
       console.error('Erro ao salvar senha:', error);
-      if (error.response && error.response.status === 401) {
+      
+      // Verifica se é um erro de nome duplicado
+      if (error.message && error.message.includes('nome')) {
+        Alert.alert(
+          'Nome duplicado', 
+          'Já existe uma senha com este nome. Escolha um nome diferente.',
+          [{ text: 'OK' }]
+        );
+      } else if (error.response && error.response.status === 401) {
         Alert.alert('Sessão expirada', 'Sua sessão expirou. Por favor, faça login novamente.');
+      } else if (error.message && error.message.includes('indisponível')) {
+        // Se o backend estiver indisponível, salve localmente
+        try {
+          const localSavedPassword = {
+            id: Date.now(),
+            name: passwordName.trim(),
+            password: password,
+            created_at: new Date().toISOString(),
+            isLocal: true // Marca que é salvo localmente
+          };
+          
+          // Adiciona aos savedPasswords
+          const updatedSavedPasswords = [localSavedPassword, ...savedPasswords];
+          setSavedPasswords(updatedSavedPasswords);
+          
+          // Também salva no histórico
+          await saveToHistory(password);
+          
+          Alert.alert(
+            'Salvo localmente', 
+            'O servidor está indisponível. A senha foi salva apenas neste dispositivo.',
+            [{ text: 'OK' }]
+          );
+          
+          setPasswordName('');
+        } catch (localError) {
+          console.error('Erro ao salvar localmente:', localError);
+          Alert.alert('Erro', 'Não foi possível salvar a senha localmente.');
+        }
       } else {
         Alert.alert('Erro', 'Não foi possível salvar a senha.');
       }
@@ -114,7 +187,7 @@ const PasswordGenerator = ({ navigation }) => {
     }
   };
 
-  const handleDeleteSavedPassword = (id, name) => {
+  const handleDeleteSavedPassword = (id, name, isLocal = false) => {
     Alert.alert(
       'Confirmação',
       `Tem certeza que deseja excluir a senha "${name}"?`,
@@ -124,13 +197,21 @@ const PasswordGenerator = ({ navigation }) => {
           text: 'Excluir', 
           onPress: async () => {
             try {
-              await passwordApi.deletePassword(id);
-              
-              // Reload saved passwords
-              const apiSavedPasswords = await passwordApi.getSavedPasswords();
-              setSavedPasswords(apiSavedPasswords || []);
-              
-              Alert.alert('Sucesso', 'Senha excluída com sucesso.');
+              if (isLocal) {
+                // Se for uma senha local, apenas remova da lista local
+                const updatedPasswords = savedPasswords.filter(item => item.id !== id);
+                setSavedPasswords(updatedPasswords);
+                Alert.alert('Sucesso', 'Senha local excluída com sucesso.');
+              } else {
+                // Se for uma senha do servidor, exclua pela API
+                await passwordApi.deletePassword(id);
+                
+                // Reload saved passwords
+                const apiSavedPasswords = await passwordApi.getSavedPasswords();
+                setSavedPasswords(apiSavedPasswords || []);
+                
+                Alert.alert('Sucesso', 'Senha excluída com sucesso.');
+              }
             } catch (error) {
               console.error('Erro ao excluir senha:', error);
               Alert.alert('Erro', 'Não foi possível excluir a senha.');
@@ -203,6 +284,7 @@ const PasswordGenerator = ({ navigation }) => {
         onGenerate={generateNewPassword}
         password={password}
         isGenerating={isGenerating}
+        onClear={clearPassword}
       />
     </View>
   );
@@ -253,9 +335,14 @@ const PasswordGenerator = ({ navigation }) => {
         savedPasswords.map((item) => (
           <View key={item.id} style={styles.savedPasswordContainer}>
             <View style={styles.savedPasswordHeader}>
-              <Text style={styles.savedPasswordName}>{item.name}</Text>
+              <Text style={styles.savedPasswordName}>
+                {item.name}
+                {item.isLocal && (
+                  <Text style={styles.localBadge}> (Local)</Text>
+                )}
+              </Text>
               <TouchableOpacity
-                onPress={() => handleDeleteSavedPassword(item.id, item.name)}
+                onPress={() => handleDeleteSavedPassword(item.id, item.name, item.isLocal)}
               >
                 <FontAwesome5 name="trash-alt" size={16} color="#FF6B6B" />
               </TouchableOpacity>
@@ -276,6 +363,22 @@ const PasswordGenerator = ({ navigation }) => {
           </View>
         ))
       )}
+      
+      {/* Botão para atualizar manualmente as senhas */}
+      <TouchableOpacity
+        style={styles.refreshButton}
+        onPress={loadData}
+        disabled={isLoading}
+      >
+        {isLoading ? (
+          <ActivityIndicator size="small" color="#FFFFFF" />
+        ) : (
+          <>
+            <FontAwesome5 name="sync" size={16} color="#FFFFFF" style={styles.buttonIcon} />
+            <Text style={styles.buttonText}>ATUALIZAR SENHAS</Text>
+          </>
+        )}
+      </TouchableOpacity>
     </ScrollView>
   );
 

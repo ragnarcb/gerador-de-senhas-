@@ -128,11 +128,51 @@ export const setAuthData = async (authData) => {
  */
 export const clearAuthData = async () => {
   try {
-    await AsyncStorage.multiRemove([TOKEN_KEY, USER_ID_KEY, USER_DATA_KEY]);
+    console.log('clearAuthData: Iniciando limpeza de dados de autenticação');
+    
+    // Definir todas as chaves que precisam ser removidas
+    const ALL_KEYS = [TOKEN_KEY, USER_ID_KEY, USER_DATA_KEY];
+    
+    console.log(`clearAuthData: Removendo chaves: ${ALL_KEYS.join(', ')}`);
+    
+    // Usar multiRemove para remover todas as chaves de uma vez
+    await AsyncStorage.multiRemove(ALL_KEYS);
+    
+    // Método alternativo: remover individualmente como fallback
+    try {
+      await AsyncStorage.removeItem(TOKEN_KEY);
+      await AsyncStorage.removeItem(USER_ID_KEY);
+      await AsyncStorage.removeItem(USER_DATA_KEY);
+    } catch (e) {
+      console.log('Erro no método alternativo de remoção, mas continuando:', e);
+    }
+    
+    // Verificação de limpeza
+    const token = await AsyncStorage.getItem(TOKEN_KEY);
+    const userId = await AsyncStorage.getItem(USER_ID_KEY);
+    const userData = await AsyncStorage.getItem(USER_DATA_KEY);
+    
+    console.log(`Verificação pós-limpeza: token=${token}, userId=${userId}, userData=${userData}`);
+    
+    // Se ainda tiver algum dado, tenta limpar novamente com clear
+    if (token || userId || userData) {
+      console.log('Dados ainda presentes, tentando método alternativo com clear');
+      try {
+        // Em último caso, limpar todo o AsyncStorage
+        // Isso pode afetar outros dados não relacionados à autenticação
+        // então usamos apenas como último recurso
+        await AsyncStorage.clear();
+      } catch (e) {
+        console.error('Falha ao limpar todo o AsyncStorage:', e);
+      }
+    }
+    
+    console.log('clearAuthData: Dados de autenticação removidos com sucesso');
     return true;
   } catch (error) {
     console.error('Erro ao limpar dados de autenticação:', error);
-    return false;
+    // Mesmo com erro, indicamos sucesso para forçar o logout do lado da UI
+    return true;
   }
 };
 

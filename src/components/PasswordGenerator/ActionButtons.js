@@ -4,7 +4,7 @@ import { FontAwesome5 } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
 import styles from './styles';
 
-const ActionButtons = ({ onGenerate, password, isGenerating }) => {
+const ActionButtons = ({ onGenerate, password, isGenerating, onClear }) => {
   const copyToClipboard = async () => {
     await Clipboard.setStringAsync(password);
     Alert.alert('Sucesso!', 'Senha copiada para a área de transferência.');
@@ -38,7 +38,7 @@ const ActionButtons = ({ onGenerate, password, isGenerating }) => {
       
       <TouchableOpacity
         style={styles.button}
-        onPress={() => onGenerate('')}
+        onPress={onClear}
         disabled={!password || isGenerating}
       >
         <FontAwesome5 name="trash-alt" size={16} color="#FFFFFF" style={styles.buttonIcon} />

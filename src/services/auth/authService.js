@@ -63,7 +63,7 @@ export const signin = login;
 export const logout = async () => {
     console.log('authService.logout - Iniciando logout');
     try {
-        const response = await authResource.logout();
+    const response = await authResource.logout();
         console.log('Logout concluído com sucesso');
         return response;
     } catch (error) {

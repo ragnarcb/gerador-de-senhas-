@@ -203,9 +203,16 @@ export default StyleSheet.create({
     padding: 10,
   },
   savedPasswordName: {
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: '600',
     color: '#333333',
+    flex: 1,
+  },
+  localBadge: {
+    fontSize: 14,
+    fontWeight: '400',
+    color: '#FF9500',
+    fontStyle: 'italic',
   },
   savedPasswordContent: {
     flexDirection: 'row',
@@ -215,8 +222,8 @@ export default StyleSheet.create({
   },
   savedPasswordText: {
     fontSize: 16,
-    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
-    color: '#333333',
+    fontWeight: '500',
+    color: '#4A86E8',
     flex: 1,
   },
   // Loading indicators
@@ -229,5 +236,16 @@ export default StyleSheet.create({
     fontSize: 16,
     color: '#666666',
     marginTop: 12,
+  },
+  refreshButton: {
+    backgroundColor: '#4A86E8',
+    borderRadius: 8,
+    paddingVertical: 14,
+    alignItems: 'center',
+    width: '100%',
+    marginTop: 20,
+    marginBottom: 10,
+    flexDirection: 'row',
+    justifyContent: 'center',
   },
 }); 

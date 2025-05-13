@@ -1,5 +1,5 @@
 import React, { useCallback } from 'react';
-import { View, Text, TouchableOpacity, Alert } from 'react-native';
+import { View, Text, TouchableOpacity, Alert, ToastAndroid, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { FontAwesome5 } from '@expo/vector-icons';
@@ -11,9 +11,18 @@ const APP_VERSION = '1.1.0';
 
 const Home = ({ navigation }) => {
   // Usar o contexto de autenticação para acessar o usuário e função de logout
-  const { user, logout } = useAuthContext();
+  const { user } = useAuthContext();
 
-  const handleLogout = useCallback(async () => {
+  // Função auxiliar para mostrar mensagens curtas
+  const showMessage = (msg) => {
+    if (Platform.OS === 'android') {
+      ToastAndroid.show(msg, ToastAndroid.SHORT);
+    } else {
+      console.log(msg); // No iOS, apenas log (poderia usar Alert se preferir)
+    }
+  };
+
+  const handleLogout = useCallback(() => {
     Alert.alert(
       'Logout',
       'Tem certeza que deseja sair?',
@@ -21,15 +30,18 @@ const Home = ({ navigation }) => {
         { text: 'Cancelar', style: 'cancel' },
         { 
           text: 'Sair', 
-          onPress: async () => {
-            await logout();
-            // O redirecionamento será automático pelo ProtectedRoute
+          onPress: () => {
+            console.log("Home: Redirecionando para tela de logout...");
+            showMessage("Saindo...");
+            
+            // Navegar para a tela dedicada de logout que tratará todo o processo
+            navigation.navigate('Logout');
           },
           style: 'destructive'
         }
       ]
     );
-  }, [logout]);
+  }, [navigation]);
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'left', 'right', 'bottom']}>
@@ -40,11 +52,22 @@ const Home = ({ navigation }) => {
         <View style={styles.userInfo}>
           <FontAwesome5 name="user-circle" size={20} color="#4A86E8" style={styles.userIcon} />
           <Text style={styles.username}>
-            Olá, {user?.username || 'usuário'}
+            Olá, {user && user.username ? user.username : 'usuário'}
           </Text>
         </View>
-        <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
-          <FontAwesome5 name="sign-out-alt" size={18} color="#666666" />
+        <TouchableOpacity 
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            backgroundColor: '#F0F0F0',
+            paddingVertical: 6,
+            paddingHorizontal: 10,
+            borderRadius: 20,
+          }} 
+          onPress={handleLogout}
+        >
+          <FontAwesome5 name="sign-out-alt" size={16} color="#F44336" />
+          <Text style={{marginLeft: 5, color: '#333', fontWeight: '500', fontSize: 14}}>Sair</Text>
         </TouchableOpacity>
       </View>
       
@@ -58,7 +81,15 @@ const Home = ({ navigation }) => {
           <FontAwesome5 name="shield-alt" size={14} color="#4A86E8" />
           <Text style={styles.logoText}>SENHAS SEGURAS</Text>
         </View>
-        <Text style={styles.versionText}>v{APP_VERSION}</Text>
+        <View style={{flexDirection: 'row', alignItems: 'center'}}>
+          <TouchableOpacity 
+            onPress={() => navigation.navigate('Logout')}
+            style={{marginRight: 10}}
+          >
+            <Text style={{fontSize: 12, color: '#F44336'}}>Forçar Logout</Text>
+          </TouchableOpacity>
+          <Text style={styles.versionText}>v{APP_VERSION}</Text>
+        </View>
       </View>
     </SafeAreaView>
   );

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, ActivityIndicator, Text, StyleSheet } from 'react-native';
-import { isAuthenticated } from './authUtils';
+import { isAuthenticated, getAuthToken } from './authUtils';
+import { CommonActions } from '@react-navigation/native';
 
 /**
  * Componente de proteção de rota
@@ -34,17 +35,47 @@ const ProtectedRoute = ({ component: Component, navigation, ...rest }) => {
   const checkAuth = async () => {
     setLoading(true);
     try {
+      console.log('ProtectedRoute: Verificando autenticação...');
+      const token = await getAuthToken();
+      console.log(`ProtectedRoute: Token presente? ${!!token}`);
+      
       const auth = await isAuthenticated();
-      setIsAuth(auth);
+      console.log(`ProtectedRoute: Autenticado? ${auth}`);
       
       if (!auth) {
-        // Se não estiver autenticado, redirecionar para a tela de login
-        navigation.replace('Login');
+        console.log('ProtectedRoute: Não autenticado, redirecionando para Login');
+        // Atualizar estado antes de redirecionar
+        setIsAuth(false);
+        setLoading(false);
+        
+        // Usar CommonActions para garantir que a navegação reset corretamente o histórico
+        // e evitar loops de navegação
+        setTimeout(() => {
+          navigation.dispatch(
+            CommonActions.reset({
+              index: 0,
+              routes: [{ name: 'Login' }],
+            })
+          );
+        }, 0);
+        return;
       }
+      
+      // Se chegou aqui, está autenticado
+      setIsAuth(auth);
     } catch (error) {
       console.error('Erro ao verificar autenticação:', error);
       setIsAuth(false);
-      navigation.replace('Login');
+      
+      console.log('ProtectedRoute: Erro na autenticação, redirecionando para Login');
+      setTimeout(() => {
+        navigation.dispatch(
+          CommonActions.reset({
+            index: 0,
+            routes: [{ name: 'Login' }],
+          })
+        );
+      }, 0);
     } finally {
       setLoading(false);
     }

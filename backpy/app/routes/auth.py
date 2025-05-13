@@ -71,7 +71,7 @@ def register():
     
     db.session.add(user)
     db.session.commit()
-    
+        
     return jsonify({
         "message": "Usuário registrado com sucesso",
         "user_id": user.id
