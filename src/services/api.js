@@ -6,7 +6,7 @@ class ApiService {
   constructor() {
     // Para web em desenvolvimento, usar localhost
     // Em um ambiente de produção real, isto seria uma URL de API
-    const baseURL = 'http://localhost:5000';
+    const baseURL = 'http://192.168.1.10:8089';
                     
     console.log(`Inicializando ApiService com baseURL: ${baseURL}`);
     

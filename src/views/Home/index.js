@@ -55,20 +55,6 @@ const Home = ({ navigation }) => {
             Olá, {user && user.username ? user.username : 'usuário'}
           </Text>
         </View>
-        <TouchableOpacity 
-          style={{
-            flexDirection: 'row',
-            alignItems: 'center',
-            backgroundColor: '#F0F0F0',
-            paddingVertical: 6,
-            paddingHorizontal: 10,
-            borderRadius: 20,
-          }} 
-          onPress={handleLogout}
-        >
-          <FontAwesome5 name="sign-out-alt" size={16} color="#F44336" />
-          <Text style={{marginLeft: 5, color: '#333', fontWeight: '500', fontSize: 14}}>Sair</Text>
-        </TouchableOpacity>
       </View>
       
       <View style={{ flex: 1 }}>

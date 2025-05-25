@@ -6,11 +6,11 @@ import { Platform } from 'react-native';
 // 10.0.2.2 para Android emulator, 127.0.0.1 para web, e o IP real para iOS/outros
 const getApiUrl = () => {
   if (Platform.OS === 'web') {
-    return 'http://127.0.0.1:5000'; // Web
+    return 'http://127.0.0.1:8089'; // Web
   } else if (Platform.OS === 'android') {
-    return 'http://10.0.2.2:5000'; // Android emulator
+    return 'http://127.0.0.1:8089'; // Android emulator
   } else {
-    return 'http://127.0.0.1:5000'; // iOS e outros
+    return 'http://127.0.0.1:8089'; // iOS e outros
   }
 };
 

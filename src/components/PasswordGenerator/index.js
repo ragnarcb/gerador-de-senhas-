@@ -21,6 +21,9 @@ const PasswordGenerator = ({ navigation }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isPasswordVisible, setIsPasswordVisible] = useState(false);
+  const [visibleIndexesHistory, setVisibleIndexesHistory] = useState([]);
+  const [visibleIndexesSaved, setVisibleIndexesSaved] = useState([]);
 
   // Carregar o histórico e senhas salvas ao iniciar
   useEffect(() => {
@@ -254,7 +257,7 @@ const PasswordGenerator = ({ navigation }) => {
   const renderGeneratorTab = () => (
     <View style={styles.tabContent}>
       <Header />
-      <PasswordDisplay password={password} />
+      <PasswordDisplay password={password} setPassword={setPassword} isVisible={isPasswordVisible} setIsVisible={setIsPasswordVisible} />
       <StrengthIndicator strength={passwordStrength} />
       
       <View style={styles.saveContainer}>
@@ -289,6 +292,10 @@ const PasswordGenerator = ({ navigation }) => {
     </View>
   );
 
+  const toggleVisibilityHistory = (idx) => {
+    setVisibleIndexesHistory((prev) => prev.includes(idx) ? prev.filter(i => i !== idx) : [...prev, idx]);
+  };
+
   const renderHistoryTab = () => (
     <ScrollView style={styles.tabContent}>
       <Text style={styles.sectionTitle}>Histórico de Senhas Geradas</Text>
@@ -299,9 +306,17 @@ const PasswordGenerator = ({ navigation }) => {
           <Text style={styles.emptySubText}>As senhas geradas aparecerão aqui</Text>
         </View>
       ) : (
-        passwordHistory.map((item) => (
+        passwordHistory.map((item, idx) => (
           <View key={item.id} style={styles.passwordItemContainer}>
-            <Text style={styles.passwordItem}>{item.password}</Text>
+            <TextInput
+              style={styles.passwordItem}
+              value={item.password}
+              secureTextEntry={!visibleIndexesHistory.includes(idx)}
+              editable={false}
+            />
+            <TouchableOpacity onPress={() => toggleVisibilityHistory(idx)} style={styles.copyButton}>
+              <FontAwesome5 name={visibleIndexesHistory.includes(idx) ? 'eye' : 'eye-slash'} size={20} color="#4A86E8" />
+            </TouchableOpacity>
             <TouchableOpacity
               style={styles.copyButton}
               onPress={() => {
@@ -316,6 +331,10 @@ const PasswordGenerator = ({ navigation }) => {
       )}
     </ScrollView>
   );
+
+  const toggleVisibilitySaved = (idx) => {
+    setVisibleIndexesSaved((prev) => prev.includes(idx) ? prev.filter(i => i !== idx) : [...prev, idx]);
+  };
 
   const renderSavedTab = () => (
     <ScrollView style={styles.tabContent}>
@@ -332,7 +351,7 @@ const PasswordGenerator = ({ navigation }) => {
           <Text style={styles.emptySubText}>Salve senhas com um nome para acessá-las facilmente</Text>
         </View>
       ) : (
-        savedPasswords.map((item) => (
+        savedPasswords.map((item, idx) => (
           <View key={item.id} style={styles.savedPasswordContainer}>
             <View style={styles.savedPasswordHeader}>
               <Text style={styles.savedPasswordName}>
@@ -348,7 +367,15 @@ const PasswordGenerator = ({ navigation }) => {
               </TouchableOpacity>
             </View>
             <View style={styles.savedPasswordContent}>
-              <Text style={styles.savedPasswordText}>{item.password}</Text>
+              <TextInput
+                style={styles.savedPasswordText}
+                value={item.password}
+                secureTextEntry={!visibleIndexesSaved.includes(idx)}
+                editable={false}
+              />
+              <TouchableOpacity onPress={() => toggleVisibilitySaved(idx)} style={styles.copyButton}>
+                <FontAwesome5 name={visibleIndexesSaved.includes(idx) ? 'eye' : 'eye-slash'} size={20} color="#4A86E8" />
+              </TouchableOpacity>
               <TouchableOpacity
                 style={styles.copyButton}
                 onPress={() => {
@@ -363,7 +390,6 @@ const PasswordGenerator = ({ navigation }) => {
           </View>
         ))
       )}
-      
       {/* Botão para atualizar manualmente as senhas */}
       <TouchableOpacity
         style={styles.refreshButton}
