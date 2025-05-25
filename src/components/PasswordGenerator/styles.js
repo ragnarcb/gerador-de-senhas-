@@ -136,6 +136,7 @@ export default StyleSheet.create({
     padding: 12,
     fontSize: 16,
     marginBottom: 10,
+    color: '#333333',
   },
   saveButton: {
     backgroundColor: '#4CAF50',

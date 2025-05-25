@@ -264,6 +264,7 @@ const PasswordGenerator = ({ navigation }) => {
         <TextInput
           style={styles.input}
           placeholder="Nome da senha (ex: Email trabalho)"
+          placeholderTextColor="#BBBBBB"
           value={passwordName}
           onChangeText={setPasswordName}
         />
