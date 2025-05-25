@@ -72,7 +72,7 @@ const Home = ({ navigation }) => {
             onPress={() => navigation.navigate('Logout')}
             style={{marginRight: 10}}
           >
-            <Text style={{fontSize: 12, color: '#F44336'}}>Forçar Logout</Text>
+            <Text style={{fontSize: 12, color: '#F44336'}}>Logout</Text>
           </TouchableOpacity>
           <Text style={styles.versionText}>v{APP_VERSION}</Text>
         </View>

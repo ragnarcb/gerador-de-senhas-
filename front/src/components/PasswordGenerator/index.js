@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TextInput, TouchableOpacity, Alert, ScrollView, ActivityIndicator, Modal, TouchableWithoutFeedback, Keyboard, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, Alert, ScrollView, ActivityIndicator, Modal, TouchableWithoutFeedback, Keyboard, KeyboardAvoidingView, Platform, ToastAndroid } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { FontAwesome5 } from '@expo/vector-icons';
 import { evaluatePasswordStrength } from '../../services/passwordGenerator';
@@ -10,6 +10,7 @@ import PasswordDisplay from './PasswordDisplay';
 import StrengthIndicator from './StrengthIndicator';
 import ActionButtons from './ActionButtons';
 import styles from './styles';
+import * as Clipboard from 'expo-clipboard';
 
 const PasswordGenerator = ({ navigation }) => {
   const [password, setPassword] = useState('');
@@ -446,6 +447,15 @@ const PasswordGenerator = ({ navigation }) => {
     setVisibleIndexesHistory((prev) => prev.includes(idx) ? prev.filter(i => i !== idx) : [...prev, idx]);
   };
 
+  const copyPassword = async (password) => {
+    await Clipboard.setStringAsync(password);
+    if (Platform.OS === 'android') {
+      ToastAndroid.show('Senha copiada!', ToastAndroid.SHORT);
+    } else {
+      Alert.alert('Copiado', 'Senha copiada para a área de transferência!');
+    }
+  };
+
   const renderHistoryTab = () => (
     <TouchableWithoutFeedback onPress={dismissKeyboard}>
       <ScrollView style={styles.tabContent}>
@@ -476,6 +486,12 @@ const PasswordGenerator = ({ navigation }) => {
                 }}
               >
                 <FontAwesome5 name="arrow-circle-right" size={20} color="#4A86E8" />
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.copyButton}
+                onPress={() => copyPassword(item.password)}
+              >
+                <FontAwesome5 name="copy" size={20} color="#4A86E8" />
               </TouchableOpacity>
             </View>
           ))
@@ -538,6 +554,12 @@ const PasswordGenerator = ({ navigation }) => {
                   }}
                 >
                   <FontAwesome5 name="arrow-circle-right" size={20} color="#4A86E8" />
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.copyButton}
+                  onPress={() => copyPassword(item.password)}
+                >
+                  <FontAwesome5 name="copy" size={20} color="#4A86E8" />
                 </TouchableOpacity>
               </View>
             </View>
