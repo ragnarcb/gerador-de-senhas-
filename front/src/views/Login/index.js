@@ -23,6 +23,7 @@ const Login = ({ navigation }) => {
   const { login, isLoggedIn, loading: authLoading } = useAuthContext();
   const [isLogin, setIsLogin] = useState(true);
   const [loading, setLoading] = useState(false);
+  const [errors, setErrors] = useState({});
   const [formData, setFormData] = useState({
     username: '',
     email: '',
@@ -42,36 +43,55 @@ const Login = ({ navigation }) => {
       ...prev,
       [field]: value
     }));
+    // Limpa o erro do campo quando o usuário começa a digitar
+    if (errors[field]) {
+      setErrors(prev => ({
+        ...prev,
+        [field]: null
+      }));
+    }
   };
 
   const validateForm = () => {
     const { username, email, password, confirmPassword } = formData;
+    const newErrors = {};
 
     if (isLogin) {
-      if (!username || !password) {
-        Alert.alert('Erro', 'Por favor, preencha todos os campos');
-        return false;
+      if (!username) {
+        newErrors.username = 'Nome de usuário é obrigatório';
+      }
+      if (!password) {
+        newErrors.password = 'Senha é obrigatória';
       }
     } else {
-      if (!username || !email || !password || !confirmPassword) {
-        Alert.alert('Erro', 'Por favor, preencha todos os campos');
-        return false;
+      if (!username) {
+        newErrors.username = 'Nome de usuário é obrigatório';
+      } else if (username.length < 3) {
+        newErrors.username = 'Nome de usuário deve ter pelo menos 3 caracteres';
       }
       
-      if (password !== confirmPassword) {
-        Alert.alert('Erro', 'As senhas não coincidem');
-        return false;
+      if (!email) {
+        newErrors.email = 'Email é obrigatório';
+      } else {
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(email)) {
+          newErrors.email = 'Por favor, insira um email válido';
+        }
       }
-
-      // Validação básica de email
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      if (!emailRegex.test(email)) {
-        Alert.alert('Erro', 'Por favor, insira um email válido');
-        return false;
+      
+      if (!password) {
+        newErrors.password = 'Senha é obrigatória';
+      }
+      
+      if (!confirmPassword) {
+        newErrors.confirmPassword = 'Confirmação de senha é obrigatória';
+      } else if (password !== confirmPassword) {
+        newErrors.confirmPassword = 'As senhas não coincidem';
       }
     }
 
-    return true;
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
   };
 
   const handleSubmit = async () => {
@@ -98,7 +118,6 @@ const Login = ({ navigation }) => {
         await login(result);
         console.log('Login bem-sucedido!');
         
-        // Redirecionamento será automático pelo useEffect que monitora isLoggedIn
       } else {
         // Registro
         console.log('Dados de registro:', { 
@@ -117,14 +136,34 @@ const Login = ({ navigation }) => {
           ...prev,
           confirmPassword: ''
         }));
-        setTimeout(() => setIsLogin(true), 500); // Redireciona automaticamente
+        setTimeout(() => setIsLogin(true), 500);
       }
     } catch (error) {
       console.error(`Erro no ${isLogin ? 'login' : 'registro'}:`, error);
       
-      // Usar o utilitário para formatar erros
-      const errorMessage = formatAuthError(error);
-      Alert.alert('Erro', errorMessage);
+      // Tratamento específico de erros
+      if (error.response) {
+        const { status, data } = error.response;
+        
+        if (status === 401) {
+          setErrors({
+            username: 'Nome de usuário ou senha incorretos',
+            password: 'Nome de usuário ou senha incorretos'
+          });
+        } else if (status === 400) {
+          if (data.message.includes('username')) {
+            setErrors({ username: 'Este nome de usuário já está em uso' });
+          } else if (data.message.includes('email')) {
+            setErrors({ email: 'Este email já está em uso' });
+          } else {
+            setErrors({ general: data.message || 'Dados inválidos' });
+          }
+        } else {
+          setErrors({ general: 'Erro ao processar sua solicitação. Tente novamente.' });
+        }
+      } else {
+        setErrors({ general: 'Não foi possível conectar ao servidor. Verifique sua conexão de internet.' });
+      }
     } finally {
       setLoading(false);
     }
@@ -132,6 +171,7 @@ const Login = ({ navigation }) => {
 
   const toggleAuthMode = () => {
     setIsLogin(!isLogin);
+    setErrors({}); // Limpa os erros ao trocar de modo
     // Limpa os campos ao alternar entre modos
     setFormData({
       username: formData.username, // mantém o username
@@ -165,55 +205,70 @@ const Login = ({ navigation }) => {
                 : 'Preencha os dados para criar sua conta'}
             </Text>
             
+            {/* Mensagem de erro geral */}
+            {errors.general && (
+              <View style={styles.generalErrorContainer}>
+                <Text style={styles.generalErrorText}>{errors.general}</Text>
+              </View>
+            )}
+            
             {/* Formulário */}
             <View style={styles.form}>
               <View style={styles.inputContainer}>
                 <FontAwesome5 name="user" size={16} color="#4A86E8" style={styles.inputIcon} />
                 <TextInput
-                  style={styles.input}
+                  style={[styles.input, errors.username && styles.inputError]}
                   placeholder="Nome de usuário"
                   value={formData.username}
                   onChangeText={(value) => handleChange('username', value)}
                   autoCapitalize="none"
                 />
               </View>
+              {errors.username && <Text style={styles.errorText}>{errors.username}</Text>}
               
               {!isLogin && (
-                <View style={styles.inputContainer}>
-                  <FontAwesome5 name="envelope" size={16} color="#4A86E8" style={styles.inputIcon} />
-                  <TextInput
-                    style={styles.input}
-                    placeholder="Email"
-                    value={formData.email}
-                    onChangeText={(value) => handleChange('email', value)}
-                    keyboardType="email-address"
-                    autoCapitalize="none"
-                  />
-                </View>
+                <>
+                  <View style={styles.inputContainer}>
+                    <FontAwesome5 name="envelope" size={16} color="#4A86E8" style={styles.inputIcon} />
+                    <TextInput
+                      style={[styles.input, errors.email && styles.inputError]}
+                      placeholder="Email"
+                      value={formData.email}
+                      onChangeText={(value) => handleChange('email', value)}
+                      keyboardType="email-address"
+                      autoCapitalize="none"
+                    />
+                  </View>
+                  {errors.email && <Text style={styles.errorText}>{errors.email}</Text>}
+                </>
               )}
               
               <View style={styles.inputContainer}>
                 <FontAwesome5 name="lock" size={16} color="#4A86E8" style={styles.inputIcon} />
                 <TextInput
-                  style={styles.input}
+                  style={[styles.input, errors.password && styles.inputError]}
                   placeholder="Senha"
                   value={formData.password}
                   onChangeText={(value) => handleChange('password', value)}
                   secureTextEntry
                 />
               </View>
+              {errors.password && <Text style={styles.errorText}>{errors.password}</Text>}
               
               {!isLogin && (
-                <View style={styles.inputContainer}>
-                  <FontAwesome5 name="lock" size={16} color="#4A86E8" style={styles.inputIcon} />
-                  <TextInput
-                    style={styles.input}
-                    placeholder="Confirme a senha"
-                    value={formData.confirmPassword}
-                    onChangeText={(value) => handleChange('confirmPassword', value)}
-                    secureTextEntry
-                  />
-                </View>
+                <>
+                  <View style={styles.inputContainer}>
+                    <FontAwesome5 name="lock" size={16} color="#4A86E8" style={styles.inputIcon} />
+                    <TextInput
+                      style={[styles.input, errors.confirmPassword && styles.inputError]}
+                      placeholder="Confirme a senha"
+                      value={formData.confirmPassword}
+                      onChangeText={(value) => handleChange('confirmPassword', value)}
+                      secureTextEntry
+                    />
+                  </View>
+                  {errors.confirmPassword && <Text style={styles.errorText}>{errors.confirmPassword}</Text>}
+                </>
               )}
               
               <TouchableOpacity
@@ -248,7 +303,9 @@ const Login = ({ navigation }) => {
       
       {/* Rodapé da aplicação */}
       <View style={styles.footer}>
-        <Text style={styles.versionText}>v1.1.0</Text>
+        <Text style={styles.footerText}>
+          Desenvolvido por Raganar
+        </Text>
       </View>
     </SafeAreaView>
   );
