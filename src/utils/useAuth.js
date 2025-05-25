@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import * as authUtils from './authUtils';
+import { Platform } from 'react-native';
 
 /**
  * Hook personalizado para gerenciar o estado de autenticação do usuário
@@ -113,9 +114,16 @@ const useAuth = () => {
       console.log('useAuth: Limpando AsyncStorage...');
       await authUtils.clearAuthData();
       
-      // Verificação direta usando AsyncStorage para garantir
-      const AsyncStorage = require('@react-native-async-storage/async-storage').default;
-      await AsyncStorage.clear();
+      // Não usar AsyncStorage.clear() diretamente no iOS
+      if (Platform.OS !== 'ios') {
+        console.log('useAuth: Verificação final do AsyncStorage');
+        const AsyncStorage = require('@react-native-async-storage/async-storage').default;
+        try {
+          await AsyncStorage.clear();
+        } catch (clearError) {
+          console.log('Erro ao limpar AsyncStorage, mas continuando:', clearError);
+        }
+      }
       
       console.log('useAuth: Logout completo, todos os dados limpos');
       return true;

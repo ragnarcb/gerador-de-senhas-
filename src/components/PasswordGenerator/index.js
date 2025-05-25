@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TextInput, TouchableOpacity, Alert, ScrollView, ActivityIndicator } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, Alert, ScrollView, ActivityIndicator, Modal, TouchableWithoutFeedback, Keyboard, KeyboardAvoidingView, Platform } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { FontAwesome5 } from '@expo/vector-icons';
 import { evaluatePasswordStrength } from '../../services/passwordGenerator';
@@ -24,6 +24,10 @@ const PasswordGenerator = ({ navigation }) => {
   const [isPasswordVisible, setIsPasswordVisible] = useState(false);
   const [visibleIndexesHistory, setVisibleIndexesHistory] = useState([]);
   const [visibleIndexesSaved, setVisibleIndexesSaved] = useState([]);
+  const [isModalVisible, setIsModalVisible] = useState(false);
+  const [modalPassword, setModalPassword] = useState('');
+  const [modalPasswordName, setModalPasswordName] = useState('');
+  const [modalPasswordVisible, setModalPasswordVisible] = useState(false);
 
   // Carregar o histórico e senhas salvas ao iniciar
   useEffect(() => {
@@ -254,43 +258,188 @@ const PasswordGenerator = ({ navigation }) => {
     </View>
   );
 
-  const renderGeneratorTab = () => (
-    <View style={styles.tabContent}>
-      <Header />
-      <PasswordDisplay password={password} setPassword={setPassword} isVisible={isPasswordVisible} setIsVisible={setIsPasswordVisible} />
-      <StrengthIndicator strength={passwordStrength} />
+  // Função para fechar o teclado ao clicar em qualquer lugar da tela
+  const dismissKeyboard = () => {
+    Keyboard.dismiss();
+  };
+  
+  // Função para abrir o modal de salvar senha
+  const openSaveModal = () => {
+    setModalPassword(password);
+    setModalPasswordName(passwordName);
+    setModalPasswordVisible(isPasswordVisible);
+    setIsModalVisible(true);
+  };
+  
+  // Função para fechar o modal
+  const closeSaveModal = () => {
+    setIsModalVisible(false);
+  };
+  
+  // Função atualizada para salvar a senha do modal
+  const saveModalPassword = async () => {
+    if (!modalPassword) {
+      Alert.alert('Erro', 'Nenhuma senha gerada para salvar.');
+      return;
+    }
+
+    if (!modalPasswordName.trim()) {
+      Alert.alert('Erro', 'Dê um nome para sua senha.');
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      // Save password to API
+      await passwordApi.savePassword(modalPasswordName.trim(), modalPassword);
+      Alert.alert('Sucesso', 'Senha salva com sucesso!');
+      setPasswordName('');
+      setModalPasswordName('');
+      closeSaveModal();
       
-      <View style={styles.saveContainer}>
-        <TextInput
-          style={styles.input}
-          placeholder="Nome da senha (ex: Email trabalho)"
-          placeholderTextColor="#BBBBBB"
-          value={passwordName}
-          onChangeText={setPasswordName}
-        />
+      // Reload saved passwords
+      const apiSavedPasswords = await passwordApi.getSavedPasswords();
+      setSavedPasswords(apiSavedPasswords || []);
+    } catch (error) {
+      console.error('Erro ao salvar senha:', error);
+      
+      // Verifica se é um erro de nome duplicado
+      if (error.message && error.message.includes('nome')) {
+        Alert.alert(
+          'Nome duplicado', 
+          'Já existe uma senha com este nome. Escolha um nome diferente.',
+          [{ text: 'OK' }]
+        );
+      } else if (error.response && error.response.status === 401) {
+        Alert.alert('Sessão expirada', 'Sua sessão expirou. Por favor, faça login novamente.');
+      } else if (error.message && error.message.includes('indisponível')) {
+        // Se o backend estiver indisponível, salve localmente
+        try {
+          const localSavedPassword = {
+            id: Date.now(),
+            name: modalPasswordName.trim(),
+            password: modalPassword,
+            created_at: new Date().toISOString(),
+            isLocal: true // Marca que é salvo localmente
+          };
+          
+          // Adiciona aos savedPasswords
+          const updatedSavedPasswords = [localSavedPassword, ...savedPasswords];
+          setSavedPasswords(updatedSavedPasswords);
+          
+          // Também salva no histórico
+          await saveToHistory(modalPassword);
+          
+          Alert.alert(
+            'Salvo localmente', 
+            'O servidor está indisponível. A senha foi salva apenas neste dispositivo.',
+            [{ text: 'OK' }]
+          );
+          
+          setPasswordName('');
+          setModalPasswordName('');
+          closeSaveModal();
+        } catch (localError) {
+          console.error('Erro ao salvar localmente:', localError);
+          Alert.alert('Erro', 'Não foi possível salvar a senha localmente.');
+        }
+      } else {
+        Alert.alert('Erro', 'Não foi possível salvar a senha.');
+      }
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const renderGeneratorTab = () => (
+    <TouchableWithoutFeedback onPress={dismissKeyboard}>
+      <View style={styles.tabContent}>
+        <Header />
+        <PasswordDisplay password={password} setPassword={setPassword} isVisible={isPasswordVisible} setIsVisible={setIsPasswordVisible} />
+        <StrengthIndicator strength={passwordStrength} />
+        
         <TouchableOpacity 
           style={styles.saveButton}
-          onPress={savePassword}
-          disabled={isSaving}
+          onPress={openSaveModal}
         >
-          {isSaving ? (
-            <ActivityIndicator size="small" color="#FFFFFF" />
-          ) : (
-            <>
-              <FontAwesome5 name="save" size={16} color="#FFFFFF" style={styles.buttonIcon} />
-              <Text style={styles.buttonText}>SALVAR</Text>
-            </>
-          )}
+          <FontAwesome5 name="save" size={16} color="#FFFFFF" style={styles.buttonIcon} />
+          <Text style={styles.buttonText}>SALVAR SENHA</Text>
         </TouchableOpacity>
+        
+        <ActionButtons 
+          onGenerate={generateNewPassword}
+          password={password}
+          isGenerating={isGenerating}
+          onClear={clearPassword}
+        />
+        
+        {/* Modal para salvar senha */}
+        <Modal
+          animationType="slide"
+          transparent={true}
+          visible={isModalVisible}
+          onRequestClose={closeSaveModal}
+        >
+          <TouchableWithoutFeedback onPress={dismissKeyboard}>
+            <View style={styles.modalOverlay}>
+              <KeyboardAvoidingView
+                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                style={styles.modalContainer}
+              >
+                <View style={styles.modalContent}>
+                  <Text style={styles.modalTitle}>Salvar Senha</Text>
+                  
+                  <View style={styles.passwordDisplayModal}>
+                    <TextInput
+                      style={styles.modalPasswordInput}
+                      value={modalPassword}
+                      onChangeText={setModalPassword}
+                      secureTextEntry={!modalPasswordVisible}
+                      editable={true}
+                      selectTextOnFocus={true}
+                      autoCapitalize="none"
+                      autoCorrect={false}
+                    />
+                    <TouchableOpacity onPress={() => setModalPasswordVisible(!modalPasswordVisible)} style={styles.eyeButton}>
+                      <FontAwesome5 name={modalPasswordVisible ? 'eye' : 'eye-slash'} size={22} color="#4A86E8" />
+                    </TouchableOpacity>
+                  </View>
+                  
+                  <TextInput
+                    style={styles.modalInput}
+                    placeholder="Nome da senha (ex: Email trabalho)"
+                    placeholderTextColor="#BBBBBB"
+                    value={modalPasswordName}
+                    onChangeText={setModalPasswordName}
+                  />
+                  
+                  <View style={styles.modalButtonsContainer}>
+                    <TouchableOpacity 
+                      style={styles.modalCancelButton}
+                      onPress={closeSaveModal}
+                    >
+                      <Text style={styles.modalCancelButtonText}>CANCELAR</Text>
+                    </TouchableOpacity>
+                    
+                    <TouchableOpacity 
+                      style={styles.modalSaveButton}
+                      onPress={saveModalPassword}
+                      disabled={isSaving}
+                    >
+                      {isSaving ? (
+                        <ActivityIndicator size="small" color="#FFFFFF" />
+                      ) : (
+                        <Text style={styles.modalSaveButtonText}>SALVAR</Text>
+                      )}
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              </KeyboardAvoidingView>
+            </View>
+          </TouchableWithoutFeedback>
+        </Modal>
       </View>
-      
-      <ActionButtons 
-        onGenerate={generateNewPassword}
-        password={password}
-        isGenerating={isGenerating}
-        onClear={clearPassword}
-      />
-    </View>
+    </TouchableWithoutFeedback>
   );
 
   const toggleVisibilityHistory = (idx) => {
@@ -298,39 +447,41 @@ const PasswordGenerator = ({ navigation }) => {
   };
 
   const renderHistoryTab = () => (
-    <ScrollView style={styles.tabContent}>
-      <Text style={styles.sectionTitle}>Histórico de Senhas Geradas</Text>
-      {passwordHistory.length === 0 ? (
-        <View style={styles.emptyContainer}>
-          <FontAwesome5 name="history" size={32} color="#CCCCCC" />
-          <Text style={styles.emptyText}>Nenhuma senha no histórico</Text>
-          <Text style={styles.emptySubText}>As senhas geradas aparecerão aqui</Text>
-        </View>
-      ) : (
-        passwordHistory.map((item, idx) => (
-          <View key={item.id} style={styles.passwordItemContainer}>
-            <TextInput
-              style={styles.passwordItem}
-              value={item.password}
-              secureTextEntry={!visibleIndexesHistory.includes(idx)}
-              editable={false}
-            />
-            <TouchableOpacity onPress={() => toggleVisibilityHistory(idx)} style={styles.copyButton}>
-              <FontAwesome5 name={visibleIndexesHistory.includes(idx) ? 'eye' : 'eye-slash'} size={20} color="#4A86E8" />
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.copyButton}
-              onPress={() => {
-                setPassword(item.password);
-                setActiveTab('generator');
-              }}
-            >
-              <FontAwesome5 name="arrow-circle-right" size={20} color="#4A86E8" />
-            </TouchableOpacity>
+    <TouchableWithoutFeedback onPress={dismissKeyboard}>
+      <ScrollView style={styles.tabContent}>
+        <Text style={styles.sectionTitle}>Histórico de Senhas Geradas</Text>
+        {passwordHistory.length === 0 ? (
+          <View style={styles.emptyContainer}>
+            <FontAwesome5 name="history" size={32} color="#CCCCCC" />
+            <Text style={styles.emptyText}>Nenhuma senha no histórico</Text>
+            <Text style={styles.emptySubText}>As senhas geradas aparecerão aqui</Text>
           </View>
-        ))
-      )}
-    </ScrollView>
+        ) : (
+          passwordHistory.map((item, idx) => (
+            <View key={item.id} style={styles.passwordItemContainer}>
+              <TextInput
+                style={styles.passwordItem}
+                value={item.password}
+                secureTextEntry={!visibleIndexesHistory.includes(idx)}
+                editable={false}
+              />
+              <TouchableOpacity onPress={() => toggleVisibilityHistory(idx)} style={styles.copyButton}>
+                <FontAwesome5 name={visibleIndexesHistory.includes(idx) ? 'eye' : 'eye-slash'} size={20} color="#4A86E8" />
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.copyButton}
+                onPress={() => {
+                  setPassword(item.password);
+                  setActiveTab('generator');
+                }}
+              >
+                <FontAwesome5 name="arrow-circle-right" size={20} color="#4A86E8" />
+              </TouchableOpacity>
+            </View>
+          ))
+        )}
+      </ScrollView>
+    </TouchableWithoutFeedback>
   );
 
   const toggleVisibilitySaved = (idx) => {
@@ -338,87 +489,91 @@ const PasswordGenerator = ({ navigation }) => {
   };
 
   const renderSavedTab = () => (
-    <ScrollView style={styles.tabContent}>
-      <Text style={styles.sectionTitle}>Senhas Salvas</Text>
-      {isLoading ? (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#4A86E8" />
-          <Text style={styles.loadingText}>Carregando senhas...</Text>
-        </View>
-      ) : savedPasswords.length === 0 ? (
-        <View style={styles.emptyContainer}>
-          <FontAwesome5 name="save" size={32} color="#CCCCCC" />
-          <Text style={styles.emptyText}>Nenhuma senha salva</Text>
-          <Text style={styles.emptySubText}>Salve senhas com um nome para acessá-las facilmente</Text>
-        </View>
-      ) : (
-        savedPasswords.map((item, idx) => (
-          <View key={item.id} style={styles.savedPasswordContainer}>
-            <View style={styles.savedPasswordHeader}>
-              <Text style={styles.savedPasswordName}>
-                {item.name}
-                {item.isLocal && (
-                  <Text style={styles.localBadge}> (Local)</Text>
-                )}
-              </Text>
-              <TouchableOpacity
-                onPress={() => handleDeleteSavedPassword(item.id, item.name, item.isLocal)}
-              >
-                <FontAwesome5 name="trash-alt" size={16} color="#FF6B6B" />
-              </TouchableOpacity>
-            </View>
-            <View style={styles.savedPasswordContent}>
-              <TextInput
-                style={styles.savedPasswordText}
-                value={item.password}
-                secureTextEntry={!visibleIndexesSaved.includes(idx)}
-                editable={false}
-              />
-              <TouchableOpacity onPress={() => toggleVisibilitySaved(idx)} style={styles.copyButton}>
-                <FontAwesome5 name={visibleIndexesSaved.includes(idx) ? 'eye' : 'eye-slash'} size={20} color="#4A86E8" />
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.copyButton}
-                onPress={() => {
-                  setPassword(item.password);
-                  setPasswordName(item.name);
-                  setActiveTab('generator');
-                }}
-              >
-                <FontAwesome5 name="arrow-circle-right" size={20} color="#4A86E8" />
-              </TouchableOpacity>
-            </View>
-          </View>
-        ))
-      )}
-      {/* Botão para atualizar manualmente as senhas */}
-      <TouchableOpacity
-        style={styles.refreshButton}
-        onPress={loadData}
-        disabled={isLoading}
-      >
+    <TouchableWithoutFeedback onPress={dismissKeyboard}>
+      <ScrollView style={styles.tabContent}>
+        <Text style={styles.sectionTitle}>Senhas Salvas</Text>
         {isLoading ? (
-          <ActivityIndicator size="small" color="#FFFFFF" />
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color="#4A86E8" />
+            <Text style={styles.loadingText}>Carregando senhas...</Text>
+          </View>
+        ) : savedPasswords.length === 0 ? (
+          <View style={styles.emptyContainer}>
+            <FontAwesome5 name="save" size={32} color="#CCCCCC" />
+            <Text style={styles.emptyText}>Nenhuma senha salva</Text>
+            <Text style={styles.emptySubText}>Salve senhas com um nome para acessá-las facilmente</Text>
+          </View>
         ) : (
-          <>
-            <FontAwesome5 name="sync" size={16} color="#FFFFFF" style={styles.buttonIcon} />
-            <Text style={styles.buttonText}>ATUALIZAR SENHAS</Text>
-          </>
+          savedPasswords.map((item, idx) => (
+            <View key={item.id} style={styles.savedPasswordContainer}>
+              <View style={styles.savedPasswordHeader}>
+                <Text style={styles.savedPasswordName}>
+                  {item.name}
+                  {item.isLocal && (
+                    <Text style={styles.localBadge}> (Local)</Text>
+                  )}
+                </Text>
+                <TouchableOpacity
+                  onPress={() => handleDeleteSavedPassword(item.id, item.name, item.isLocal)}
+                >
+                  <FontAwesome5 name="trash-alt" size={16} color="#FF6B6B" />
+                </TouchableOpacity>
+              </View>
+              <View style={styles.savedPasswordContent}>
+                <TextInput
+                  style={styles.savedPasswordText}
+                  value={item.password}
+                  secureTextEntry={!visibleIndexesSaved.includes(idx)}
+                  editable={false}
+                />
+                <TouchableOpacity onPress={() => toggleVisibilitySaved(idx)} style={styles.copyButton}>
+                  <FontAwesome5 name={visibleIndexesSaved.includes(idx) ? 'eye' : 'eye-slash'} size={20} color="#4A86E8" />
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.copyButton}
+                  onPress={() => {
+                    setPassword(item.password);
+                    setPasswordName(item.name);
+                    setActiveTab('generator');
+                  }}
+                >
+                  <FontAwesome5 name="arrow-circle-right" size={20} color="#4A86E8" />
+                </TouchableOpacity>
+              </View>
+            </View>
+          ))
         )}
-      </TouchableOpacity>
-    </ScrollView>
+        {/* Botão para atualizar manualmente as senhas */}
+        <TouchableOpacity
+          style={styles.refreshButton}
+          onPress={loadData}
+          disabled={isLoading}
+        >
+          {isLoading ? (
+            <ActivityIndicator size="small" color="#FFFFFF" />
+          ) : (
+            <>
+              <FontAwesome5 name="sync" size={16} color="#FFFFFF" style={styles.buttonIcon} />
+              <Text style={styles.buttonText}>ATUALIZAR SENHAS</Text>
+            </>
+          )}
+        </TouchableOpacity>
+      </ScrollView>
+    </TouchableWithoutFeedback>
   );
 
   return (
-    <View style={styles.container}>
-      <StatusBar style="dark" />
-      
-      {renderTabs()}
-      
-      {activeTab === 'generator' && renderGeneratorTab()}
-      {activeTab === 'history' && renderHistoryTab()}
-      {activeTab === 'saved' && renderSavedTab()}
-    </View>
+    <TouchableWithoutFeedback onPress={dismissKeyboard}>
+      <View style={styles.container}>
+        <StatusBar style="dark" />
+        
+        {renderTabs()}
+        
+        {activeTab === 'generator' && renderGeneratorTab()}
+        {activeTab === 'history' && renderHistoryTab()}
+        {activeTab === 'saved' && renderSavedTab()}
+      </View>
+    </TouchableWithoutFeedback>
   );
 };
 

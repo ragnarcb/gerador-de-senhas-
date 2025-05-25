@@ -37,6 +37,7 @@ export default StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    backgroundColor: '#FFFFFF',
   },
   logoContainer: {
     flexDirection: 'row',

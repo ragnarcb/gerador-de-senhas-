@@ -38,7 +38,31 @@ const LogoutScreen = ({ navigation }) => {
         
         // Independentemente do resultado, forçar limpeza do AsyncStorage
         console.log('LogoutScreen: Forçando limpeza do AsyncStorage');
-        await AsyncStorage.clear();
+        try {
+          // Remover itens específicos primeiro para evitar o erro do iOS
+          const allKeys = await AsyncStorage.getAllKeys();
+          // Filtrar e remover apenas chaves relacionadas à autenticação e senhas
+          const keysToRemove = allKeys.filter(key => 
+            key.startsWith('@auth_') || 
+            key.startsWith('@user_') || 
+            key.startsWith('@password_')
+          );
+          
+          if (keysToRemove.length > 0) {
+            await AsyncStorage.multiRemove(keysToRemove);
+          }
+          
+          // Não chamar AsyncStorage.clear() diretamente no iOS para evitar o erro
+          if (Platform.OS !== 'ios') {
+            await AsyncStorage.clear();
+          }
+        } catch (storageError) {
+          console.log('LogoutScreen: Erro na limpeza do storage, mas continuando logout', storageError);
+          // Não interromper o fluxo de logout por causa de erro no storage
+        }
+        
+        // Adicionar um pequeno delay para garantir que as operações assíncronas terminem
+        await new Promise(resolve => setTimeout(resolve, 300));
         
         // Forçar navegação para a tela de login
         console.log('LogoutScreen: Navegando para a tela de login');

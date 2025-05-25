@@ -1,4 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Platform } from 'react-native';
 
 // Chaves de armazenamento
 const TOKEN_KEY = '@auth_token';
@@ -136,15 +137,18 @@ export const clearAuthData = async () => {
     console.log(`clearAuthData: Removendo chaves: ${ALL_KEYS.join(', ')}`);
     
     // Usar multiRemove para remover todas as chaves de uma vez
-    await AsyncStorage.multiRemove(ALL_KEYS);
-    
-    // Método alternativo: remover individualmente como fallback
     try {
-      await AsyncStorage.removeItem(TOKEN_KEY);
-      await AsyncStorage.removeItem(USER_ID_KEY);
-      await AsyncStorage.removeItem(USER_DATA_KEY);
+      await AsyncStorage.multiRemove(ALL_KEYS);
     } catch (e) {
-      console.log('Erro no método alternativo de remoção, mas continuando:', e);
+      console.log('Erro ao usar multiRemove, tentando método alternativo:', e);
+      // Método alternativo: remover individualmente
+      for (const key of ALL_KEYS) {
+        try {
+          await AsyncStorage.removeItem(key);
+        } catch (err) {
+          console.log(`Erro ao remover ${key}, continuando:`, err);
+        }
+      }
     }
     
     // Verificação de limpeza
@@ -154,16 +158,31 @@ export const clearAuthData = async () => {
     
     console.log(`Verificação pós-limpeza: token=${token}, userId=${userId}, userData=${userData}`);
     
-    // Se ainda tiver algum dado, tenta limpar novamente com clear
+    // Se ainda tiver algum dado, tenta limpar apenas chaves específicas
+    // em vez de usar clear() que pode causar problemas no iOS
     if (token || userId || userData) {
-      console.log('Dados ainda presentes, tentando método alternativo com clear');
+      console.log('Dados ainda presentes, tentando método alternativo');
       try {
-        // Em último caso, limpar todo o AsyncStorage
-        // Isso pode afetar outros dados não relacionados à autenticação
-        // então usamos apenas como último recurso
-        await AsyncStorage.clear();
+        // Obter todas as chaves e filtrar apenas as relacionadas ao app
+        const allKeys = await AsyncStorage.getAllKeys();
+        const appKeys = allKeys.filter(key => 
+          key.startsWith('@auth_') || 
+          key.startsWith('@user_') || 
+          key.startsWith('@password_')
+        );
+        
+        if (appKeys.length > 0) {
+          console.log(`Removendo ${appKeys.length} chaves específicas`);
+          await AsyncStorage.multiRemove(appKeys);
+        }
+        
+        // Evitar usar clear() no iOS para prevenir erro de "Failed to delete storage directory"
+        if (Platform.OS !== 'ios' && (token || userId || userData)) {
+          console.log('Último recurso: usando AsyncStorage.clear() em plataforma não-iOS');
+          await AsyncStorage.clear();
+        }
       } catch (e) {
-        console.error('Falha ao limpar todo o AsyncStorage:', e);
+        console.error('Falha no método alternativo de limpeza:', e);
       }
     }
     
